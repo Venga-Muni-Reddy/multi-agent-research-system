@@ -47,7 +47,7 @@ async def llm(system: str, user: str) -> str:
 
 async def planner(s: State) -> State:
     out = await llm("You are a research planner. Return 3 short, distinct web search queries for the question, one per line, no numbering.", s["question"])
-    qs = [q.strip("-* 0123456789.").strip() for q in out.splitlines() if q.strip()][:3] or [s["question"]]
+    qs = [q.strip("-* 0123456789.").strip().strip('"').strip() for q in out.splitlines() if q.strip()][:3] or [s["question"]]
     return {"plan": qs, "trace": s.get("trace", []) + [f"planner: {len(qs)} queries"]}
 
 
@@ -55,7 +55,7 @@ def _search(q: str):
     from ddgs import DDGS
     try:
         with DDGS() as d:
-            return list(d.text(q, max_results=3))
+            return list(d.text(q, region="us-en", max_results=3))
     except Exception:
         return []
 
