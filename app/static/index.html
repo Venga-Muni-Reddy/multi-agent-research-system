@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multi-Agent Research System</title>
+<style>
+body{margin:0;font:16px/1.55 system-ui,sans-serif;background:#0b1020;color:#e6e9f2}
+main{max-width:820px;margin:0 auto;padding:40px 20px}
+h1{font-size:28px;margin:0 0 6px}p.sub{color:#9aa4bf;margin:0 0 24px}
+form{display:flex;gap:10px}input{flex:1;padding:12px 14px;border-radius:10px;border:1px solid #2a3558;background:#121936;color:#fff;font-size:16px}
+button{padding:12px 20px;border:0;border-radius:10px;background:#5b8cff;color:#fff;font-weight:600;font-size:16px;cursor:pointer}button:disabled{opacity:.6}
+.card{background:#121936;border:1px solid #2a3558;border-radius:12px;padding:18px;margin-top:20px}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.step{padding:4px 10px;border-radius:99px;background:#1b2550;color:#9aa4bf;font-size:13px}.step.on{background:#1f6f43;color:#fff}
+pre{white-space:pre-wrap;font:inherit;margin:0}a{color:#7fb0ff}small{color:#9aa4bf}.err{color:#ff8a8a}
+</style></head><body><main>
+<h1>Multi-Agent Research System</h1>
+<p class="sub">Four agents share state through a LangGraph workflow: planner, retriever, analyst, report writer. Built with FastAPI + LangGraph.</p>
+<form id="f"><input id="q" placeholder="Ask a research question, e.g. How does Retrieval-Augmented Generation work?" maxlength="300" required><button id="b">Research</button></form>
+<small>Demo limits: 5 runs per hour per visitor. First request after idle can take ~1 minute while the free server wakes.</small>
+<div class="steps" id="steps"></div><div id="out"></div>
+<script>
+const f=document.getElementById('f'),out=document.getElementById('out'),steps=document.getElementById('steps'),b=document.getElementById('b');
+const names=['planner','retriever','analyst','writer'];
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+f.onsubmit=async e=>{e.preventDefault();b.disabled=true;out.innerHTML='<div class="card">Agents working... (up to ~1 minute)</div>';
+steps.innerHTML=names.map(n=>'<span class="step">'+n+'</span>').join('');
+try{const r=await fetch('/research',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:document.getElementById('q').value})});
+const d=await r.json();if(!r.ok)throw new Error(d.detail||'Request failed');
+steps.innerHTML=names.map(n=>'<span class="step on">'+n+'</span>').join('');
+out.innerHTML='<div class="card"><pre>'+esc(d.report)+'</pre></div><div class="card"><b>Sources</b><br>'+d.sources.map((s,i)=>'['+(i+1)+'] <a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title||s.url)+'</a>').join('<br>')+'</div><div class="card"><small>Plan: '+esc(d.plan.join(' | '))+'<br>Trace: '+esc(d.trace.join(' &rarr; '))+'</small></div>';
+}catch(err){out.innerHTML='<div class="card err">'+esc(err.message)+'</div>'}b.disabled=false};
+</script></main></body></html>
