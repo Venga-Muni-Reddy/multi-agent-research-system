@@ -161,12 +161,14 @@ def _fmt(src):
 
 
 async def analyst(s: State) -> State:
-    out = await llm("You are a research analyst. From the numbered sources, list the key facts relevant to the question as short bullets, citing source numbers like [2]. Do not invent facts. If the sources are irrelevant to the question, say so plainly in one line instead of answering from memory.",
+    out = await llm("You are a research analyst. From the numbered sources, list the key facts relevant to the question as short bullets, citing source numbers like [2]. Do not invent facts. If none of the sources actually help answer the question, reply with exactly NO_RELEVANT_SOURCES and nothing else. Never answer from memory.",
                     f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nSources:\n{_fmt(s['sources']) or '(no sources were found)'}")
     return {"analysis": out, "trace": s["trace"] + ["analyst: findings extracted"]}
 
 
 async def writer(s: State) -> State:
+    if "NO_RELEVANT_SOURCES" in s["analysis"] or not s["sources"]:
+        return {"report": "The retrieved sources did not cover this question well enough to answer it, so no claims are made. Try rephrasing the question or making it more specific.", "trace": s["trace"] + ["writer: no usable sources"]}
     out = await llm("You are a report writer. Write a concise, well-structured report (short intro, 3-5 bullet findings, one-line conclusion) answering the question using only the findings. Keep citations like [2]. If this is a follow-up, answer the follow-up directly. If the findings say the sources were irrelevant, say the sources did not cover the question and give no claims.",
                     f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nFindings:\n{s['analysis']}")
     return {"report": out, "trace": s["trace"] + ["writer: report drafted"]}
