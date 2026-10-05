@@ -69,7 +69,7 @@ async def planner(s: State) -> State:
 def _search(q: str):
     from ddgs import DDGS
     try:
-        with DDGS() as d:
+        with DDGS(timeout=10) as d:
             return list(d.text(q, region="us-en", max_results=3))
     except Exception:
         return []
@@ -222,7 +222,12 @@ async def research_stream(req: Req, request: Request):
             for name, fn in AGENTS:
                 yield send({"type": "start", "agent": name})
                 t0 = time.time()
-                upd = await fn(state)
+                task = asyncio.create_task(fn(state))
+                while not task.done():
+                    await asyncio.wait({task}, timeout=4)
+                    if not task.done():
+                        yield ": ping\n\n"
+                upd = task.result()
                 state.update(upd)
                 yield send({"type": "done", "agent": name, "ms": int((time.time() - t0) * 1000), "data": _summary(name, upd)})
             yield send({"type": "result", "question": req.question, "report": state["report"], "sources": state["sources"], "claims": state.get("claims", []), "plan": state["plan"]})
