@@ -66,13 +66,37 @@ async def planner(s: State) -> State:
     return {"plan": qs, "trace": s.get("trace", []) + [f"planner: {len(qs)} queries"]}
 
 
-def _search(q: str):
+ADULT = ("porn", "xxx", "xvideos", "xnxx", "xhamster", "redtube", "youporn", "onlyfans", "sex", "nsfw", "hentai", "escort", "camgirl")
+STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works".split())
+
+
+def _keywords(text: str):
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 3 and w not in STOPW}
+
+
+def _clean(hit: dict, kws: set) -> bool:
+    url = (hit.get("href") or "").lower()
+    host = (urlparse(url).hostname or "")
+    blob = (hit.get("title", "") + " " + (hit.get("body") or "")).lower()
+    if not url.startswith("http") or any(a in host or a in url.split("?")[0] for a in ADULT):
+        return False
+    if any(a in blob for a in ("porn", "xxx", "nsfw", "hentai")):
+        return False
+    return not kws or any(k in blob or k in url for k in kws)   # must mention at least one question keyword
+
+
+def _search(q: str, kws: set):
     from ddgs import DDGS
-    try:
-        with DDGS(timeout=10) as d:
-            return list(d.text(q, region="us-en", max_results=3))
-    except Exception:
-        return []
+    for backend in ("yahoo", "auto"):
+        try:
+            with DDGS(timeout=10) as d:
+                hits = list(d.text(q, region="us-en", safesearch="on", max_results=6, backend=backend))
+        except Exception:
+            continue
+        good = [h for h in hits if _clean(h, kws)][:3]
+        if good:
+            return good
+    return []
 
 
 # Heuristic source credibility by domain type. A rule-based signal, not a fact check.
@@ -96,7 +120,7 @@ def credibility(url: str) -> dict:
 
 async def retriever(s: State) -> State:
     seen, src = set(), []
-    results = await asyncio.gather(*[asyncio.to_thread(_search, q) for q in s["plan"]])
+    results = await asyncio.gather(*[asyncio.to_thread(_search, q, _keywords(s["question"] + " " + q)) for q in s["plan"]])
     for hits in results:
         for h in hits:
             u = h.get("href")
