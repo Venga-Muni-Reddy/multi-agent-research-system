@@ -77,7 +77,7 @@ async def planner(s: State) -> State:
 
 
 ADULT = ("porn", "xxx", "xvideos", "xnxx", "xhamster", "redtube", "youporn", "onlyfans", "nsfw", "hentai", "camgirl")
-STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works cause caused causes".split())
+STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works cause caused causes pros cons advantages disadvantages vs versus tradeoffs".split())
 
 
 def _keywords(text: str):
