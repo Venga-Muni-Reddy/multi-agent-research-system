@@ -77,11 +77,11 @@ async def planner(s: State) -> State:
 
 
 ADULT = ("porn", "xxx", "xvideos", "xnxx", "xhamster", "redtube", "youporn", "onlyfans", "nsfw", "hentai", "camgirl")
-STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works".split())
+STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works cause caused causes".split())
 
 
 def _keywords(text: str):
-    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 3 and w not in STOPW}
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) >= 3 and w not in STOPW}
 
 
 def _clean(hit: dict, kws: set) -> bool:
@@ -92,7 +92,8 @@ def _clean(hit: dict, kws: set) -> bool:
         return False
     if any(a in blob for a in ("porn", "xxx", "nsfw", "hentai")):
         return False
-    return not kws or any(k in blob or k in url for k in kws)   # must mention at least one question keyword
+    need = 2 if len(kws) >= 2 else 1
+    return not kws or sum(1 for k in kws if k in blob or k in url) >= need   # must mention enough question keywords
 
 
 def _search(q: str, kws: set):
@@ -106,7 +107,7 @@ def _search(q: str, kws: set):
         good = [h for h in hits if _clean(h, kws)][:3]
         if good:
             return good
-    return _wiki(q)
+    return [h for h in _wiki(q) if _clean(h, kws)]
 
 
 def _wiki(q: str):
