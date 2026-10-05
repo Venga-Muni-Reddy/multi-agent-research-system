@@ -66,7 +66,7 @@ async def planner(s: State) -> State:
     return {"plan": qs, "trace": s.get("trace", []) + [f"planner: {len(qs)} queries"]}
 
 
-ADULT = ("porn", "xxx", "xvideos", "xnxx", "xhamster", "redtube", "youporn", "onlyfans", "sex", "nsfw", "hentai", "escort", "camgirl")
+ADULT = ("porn", "xxx", "xvideos", "xnxx", "xhamster", "redtube", "youporn", "onlyfans", "nsfw", "hentai", "camgirl")
 STOPW = set("what how does the are and for with that this from have has into about between which when where why who can you your their there than then them they will would should could not but also work works".split())
 
 
