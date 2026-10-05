@@ -195,7 +195,7 @@ def _parse_claims(txt: str):
 
 async def critic(s: State) -> State:
     """Fact-check agent: checks the report's key claims against the retrieved sources."""
-    if not s["sources"]:
+    if not s["sources"] or s["report"].startswith("The retrieved sources did not cover"):
         return {"claims": [], "trace": s["trace"] + ["critic: no sources to check against"]}
     txt = await llm(
         "You are a strict fact-checking agent. List the 4 most important factual claims in the REPORT. For each, check it ONLY against the numbered SOURCES. "
