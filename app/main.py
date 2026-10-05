@@ -57,11 +57,12 @@ def _ctx(prior):
 
 async def planner(s: State) -> State:
     prior = s.get("prior") or []
-    sysmsg = "You are a research planner. Return 3 short, distinct web search queries for the question, one per line, no numbering."
+    sysmsg = "You are a research planner. Return 3 short, distinct keyword-style web search queries (3 to 7 words each, no full sentences, keep the main topic terms exactly as written in the question), one per line, no numbering."
     if prior:
         sysmsg += " The question is a follow-up: use the earlier thread to make the queries specific and self-contained (resolve pronouns like 'it' or 'that')."
     out = await llm(sysmsg, s["question"] + _ctx(prior))
-    qs = [q.strip("-* 0123456789.").strip().strip('"').strip() for q in out.splitlines() if q.strip()][:3] or [s["question"]]
+    qs = [q.strip("-* 0123456789.").strip().strip('"').strip() for q in out.splitlines() if q.strip()][:2]
+    qs = [s["question"]] + [q for q in qs if q.lower() != s["question"].lower()]
     return {"plan": qs, "trace": s.get("trace", []) + [f"planner: {len(qs)} queries"]}
 
 
@@ -95,8 +96,9 @@ def credibility(url: str) -> dict:
 
 async def retriever(s: State) -> State:
     seen, src = set(), []
-    for q in s["plan"]:
-        for h in await asyncio.to_thread(_search, q):
+    results = await asyncio.gather(*[asyncio.to_thread(_search, q) for q in s["plan"]])
+    for hits in results:
+        for h in hits:
             u = h.get("href")
             if u and u not in seen:
                 seen.add(u)
@@ -110,13 +112,13 @@ def _fmt(src):
 
 
 async def analyst(s: State) -> State:
-    out = await llm("You are a research analyst. From the numbered sources, list the key facts relevant to the question as short bullets, citing source numbers like [2]. Do not invent facts.",
+    out = await llm("You are a research analyst. From the numbered sources, list the key facts relevant to the question as short bullets, citing source numbers like [2]. Do not invent facts. If the sources are irrelevant to the question, say so plainly in one line instead of answering from memory.",
                     f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nSources:\n{_fmt(s['sources'])}")
     return {"analysis": out, "trace": s["trace"] + ["analyst: findings extracted"]}
 
 
 async def writer(s: State) -> State:
-    out = await llm("You are a report writer. Write a concise, well-structured report (short intro, 3-5 bullet findings, one-line conclusion) answering the question using only the findings. Keep citations like [2]. If this is a follow-up, answer the follow-up directly.",
+    out = await llm("You are a report writer. Write a concise, well-structured report (short intro, 3-5 bullet findings, one-line conclusion) answering the question using only the findings. Keep citations like [2]. If this is a follow-up, answer the follow-up directly. If the findings say the sources were irrelevant, say the sources did not cover the question and give no claims.",
                     f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nFindings:\n{s['analysis']}")
     return {"report": out, "trace": s["trace"] + ["writer: report drafted"]}
 
