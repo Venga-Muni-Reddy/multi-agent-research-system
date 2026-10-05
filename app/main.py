@@ -61,8 +61,18 @@ async def planner(s: State) -> State:
     if prior:
         sysmsg += " The question is a follow-up: use the earlier thread to make the queries specific and self-contained (resolve pronouns like 'it' or 'that')."
     out = await llm(sysmsg, s["question"] + _ctx(prior))
-    qs = [q.strip("-* 0123456789.").strip().strip('"').strip() for q in out.splitlines() if q.strip()][:2]
-    qs = [s["question"]] + [q for q in qs if q.lower() != s["question"].lower()]
+    qs = []
+    for q in out.splitlines():
+        q = q.strip("-* 0123456789.").strip().strip('"').strip()
+        if not q or q.endswith(":") or q.lower().startswith(("here", "sure", "okay")) or not (2 <= len(q.split()) <= 10):
+            continue
+        if q.lower() not in [x.lower() for x in qs]:
+            qs.append(q)
+    qs = qs[:2]
+    if not prior:
+        qs = [s["question"]] + [q for q in qs if q.lower() != s["question"].lower()]
+    elif not qs:
+        qs = [s["question"]]
     return {"plan": qs, "trace": s.get("trace", []) + [f"planner: {len(qs)} queries"]}
 
 
@@ -96,7 +106,21 @@ def _search(q: str, kws: set):
         good = [h for h in hits if _clean(h, kws)][:3]
         if good:
             return good
-    return []
+    return _wiki(q)
+
+
+def _wiki(q: str):
+    """Fallback: Wikipedia search API (free, no key) when the web search backend returns nothing."""
+    try:
+        r = httpx.get("https://en.wikipedia.org/w/api.php", timeout=10, headers={"User-Agent": "multi-agent-research-demo/1.0"},
+                      params={"action": "query", "list": "search", "srsearch": q, "srlimit": 3, "format": "json"})
+        out = []
+        for h in r.json()["query"]["search"]:
+            snippet = re.sub(r"<[^>]+>", "", h.get("snippet", ""))
+            out.append({"title": h["title"] + " - Wikipedia", "href": "https://en.wikipedia.org/wiki/" + h["title"].replace(" ", "_"), "body": snippet})
+        return out
+    except Exception:
+        return []
 
 
 # Heuristic source credibility by domain type. A rule-based signal, not a fact check.
@@ -137,7 +161,7 @@ def _fmt(src):
 
 async def analyst(s: State) -> State:
     out = await llm("You are a research analyst. From the numbered sources, list the key facts relevant to the question as short bullets, citing source numbers like [2]. Do not invent facts. If the sources are irrelevant to the question, say so plainly in one line instead of answering from memory.",
-                    f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nSources:\n{_fmt(s['sources'])}")
+                    f"Question: {s['question']}{_ctx(s.get('prior'))}\n\nSources:\n{_fmt(s['sources']) or '(no sources were found)'}")
     return {"analysis": out, "trace": s["trace"] + ["analyst: findings extracted"]}
 
 
@@ -168,6 +192,8 @@ def _parse_claims(txt: str):
 
 async def critic(s: State) -> State:
     """Fact-check agent: checks the report's key claims against the retrieved sources."""
+    if not s["sources"]:
+        return {"claims": [], "trace": s["trace"] + ["critic: no sources to check against"]}
     txt = await llm(
         "You are a strict fact-checking agent. List the 4 most important factual claims in the REPORT. For each, check it ONLY against the numbered SOURCES. "
         "Reply with a JSON array only, no prose: [{\"claim\": \"...\", \"verdict\": \"supported|partial|unsupported\", \"sources\": [1,2], \"note\": \"one short reason\"}]. "
