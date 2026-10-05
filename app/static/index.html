@@ -1,29 +1,153 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Multi-Agent Research System</title>
+<title>Multi-Agent Research Lab</title>
+<meta name="description" content="Five LangGraph agents plan, search, analyse, write and fact-check a research report live.">
 <style>
-body{margin:0;font:16px/1.55 system-ui,sans-serif;background:#0b1020;color:#e6e9f2}
-main{max-width:820px;margin:0 auto;padding:40px 20px}
-h1{font-size:28px;margin:0 0 6px}p.sub{color:#9aa4bf;margin:0 0 24px}
-form{display:flex;gap:10px}input{flex:1;padding:12px 14px;border-radius:10px;border:1px solid #2a3558;background:#121936;color:#fff;font-size:16px}
-button{padding:12px 20px;border:0;border-radius:10px;background:#5b8cff;color:#fff;font-weight:600;font-size:16px;cursor:pointer}button:disabled{opacity:.6}
-.card{background:#121936;border:1px solid #2a3558;border-radius:12px;padding:18px;margin-top:20px}
-.steps{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.step{padding:4px 10px;border-radius:99px;background:#1b2550;color:#9aa4bf;font-size:13px}.step.on{background:#1f6f43;color:#fff}
-pre{white-space:pre-wrap;font:inherit;margin:0}a{color:#7fb0ff}small{color:#9aa4bf}.err{color:#ff8a8a}
-</style></head><body><main>
-<h1>Multi-Agent Research System</h1>
-<p class="sub">Four agents share state through a LangGraph workflow: planner, retriever, analyst, report writer. Built with FastAPI + LangGraph.</p>
-<form id="f"><input id="q" placeholder="Ask a research question, e.g. How does Retrieval-Augmented Generation work?" maxlength="300" required><button id="b">Research</button></form>
-<small>Demo limits: 5 runs per hour per visitor. First request after idle can take ~1 minute while the free server wakes.</small>
-<div class="steps" id="steps"></div><div id="out"></div>
+:root{--bg:#070b16;--panel:#0f1530;--panel2:#141b3a;--line:#232c55;--txt:#e8ebf6;--mut:#8f98ba;--acc:#6d8dff;--acc2:#a78bfa;--ok:#35d07f;--warn:#f5b84b;--bad:#ff6b7a}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 600px at 70% -10%,#1b2352 0,transparent 60%),radial-gradient(900px 500px at -10% 10%,#2a1a55 0,transparent 55%),var(--bg);color:var(--txt);min-height:100vh}
+a{color:#8fb0ff}
+.top{max-width:1100px;margin:0 auto;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;gap:10px;align-items:center;font-weight:700;letter-spacing:.2px}.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-size:16px}
+.tags span{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:99px;padding:3px 10px;margin-left:6px;background:#0c1228}
+main{max-width:1100px;margin:0 auto;padding:0 20px 60px}
+.hero{padding:34px 0 10px;text-align:center}
+.hero h1{font-size:clamp(28px,5.2vw,48px);line-height:1.12;margin:0 0 14px;letter-spacing:-.5px}
+.grad{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--mut);max-width:680px;margin:0 auto 22px;font-size:17px}
+.ask{display:flex;gap:10px;max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 10px 40px #0007}
+.ask input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--txt);font-size:16px;padding:10px 12px}
+.btn{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:0;border-radius:11px;padding:10px 20px;font-weight:600;font-size:15px;cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.55;cursor:not-allowed}.btn.sec{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:7px 13px;font-size:13px;font-weight:500}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px auto 0;max-width:820px}
+.chip{background:#0c1228;border:1px solid var(--line);color:#b9c2e6;border-radius:99px;padding:6px 13px;font-size:13px;cursor:pointer}.chip:hover{border-color:var(--acc);color:#fff}
+.note{color:var(--mut);font-size:13px;text-align:center;margin-top:12px}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:34px 0 0}
+.how div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}.how b{display:block;margin-bottom:4px}.how small{color:var(--mut)}
+.run{display:grid;grid-template-columns:300px 1fr;gap:20px;margin-top:26px;align-items:start}
+@media(max-width:860px){.run{grid-template-columns:1fr}.rail{position:static!important}}
+.rail{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.rail h3,.card h3{margin:0 0 12px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
+.step{display:grid;grid-template-columns:26px 1fr;gap:10px;position:relative;padding-bottom:14px}
+.step:not(:last-child):before{content:"";position:absolute;left:12px;top:26px;bottom:2px;width:2px;background:var(--line)}
+.dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;background:var(--bg);color:var(--mut)}
+.step.run .dot{border-color:var(--acc);color:var(--acc);animation:pulse 1.1s infinite}.step.ok .dot{border-color:var(--ok);background:#0d2a1e;color:var(--ok)}.step.err .dot{border-color:var(--bad);color:var(--bad)}
+@keyframes pulse{50%{box-shadow:0 0 0 6px #6d8dff22}}
+.sn{font-weight:600;font-size:14px;display:flex;justify-content:space-between;gap:8px}.sn em{font-style:normal;color:var(--mut);font-weight:400;font-size:12px}
+.sd{color:var(--mut);font-size:12.5px;margin-top:2px;word-break:break-word}.sd q{display:block;color:#b9c2e6;quotes:none;margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+.q{font-size:18px;font-weight:650;margin:0 0 10px}
+.rep p{margin:.4em 0}.rep ul{margin:.4em 0;padding-left:20px}.rep li{margin:.3em 0}.rep h4{margin:.8em 0 .2em;font-size:15px}
+.cit{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#32407f;border-radius:6px;padding:0 5px;margin:0 1px;cursor:pointer;line-height:1.5;vertical-align:1px}.cit:hover{background:var(--acc)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.claim{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.claim:first-of-type{border-top:0}
+.pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-radius:99px;padding:3px 9px;height:fit-content;white-space:nowrap}
+.pill.supported{background:#0f3324;color:var(--ok)}.pill.partial{background:#3a2e0f;color:var(--warn)}.pill.unsupported{background:#3a1520;color:var(--bad)}
+.cn{font-size:12.5px;color:var(--mut)}.score{font-size:13px;color:var(--mut);margin-bottom:6px}
+.src{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line);scroll-margin-top:20px}.src:first-of-type{border-top:0}
+.src.hl{animation:hl 1.6s}@keyframes hl{0%,60%{background:#6d8dff22}}
+.num{width:30px;height:30px;border-radius:9px;background:#32407f;display:grid;place-items:center;font-weight:700;font-size:13px}
+.st{font-weight:600;font-size:14.5px;display:block}.sh{font-size:12px;color:var(--mut)}.ss{font-size:13px;color:#aab3d6;margin:4px 0}
+.cr{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}.bar{flex:0 0 90px;height:6px;background:#1b2347;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%}
+.fu{display:flex;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:8px;margin:6px 0 18px}
+.fu input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--txt);font-size:15px;padding:8px 10px}
+.turn{margin-bottom:8px}.turn.old .card{opacity:.92}
+.err{color:var(--bad)}
+.thread-tag{font-size:12px;color:var(--acc2);margin-bottom:6px}
+footer{max-width:1100px;margin:0 auto;padding:0 20px 40px;color:var(--mut);font-size:12.5px;text-align:center}
+</style></head><body>
+<div class="top"><div class="brand"><div class="logo">&#9672;</div>Multi-Agent Research Lab</div><div class="tags"><span>LangGraph</span><span>FastAPI</span><span>5 agents</span></div></div>
+<main>
+<section class="hero" id="hero">
+<h1>Five AI agents. <span class="grad">One fact-checked report.</span></h1>
+<p>Ask any research question. Watch a planner, retriever, analyst, writer and critic work through it live, then check every claim against the sources.</p>
+</section>
+<form class="ask" id="f"><input id="q" placeholder="Ask a research question..." maxlength="300" autocomplete="off" required><button class="btn" id="b">Research</button></form>
+<div class="chips" id="ex"></div>
+<div class="note">Free demo: 8 runs per hour per visitor. The first run after idle can take about a minute while the free server wakes up.</div>
+<section class="how" id="how">
+<div><b>1 Planner</b><small>Breaks the question into search queries</small></div>
+<div><b>2 Retriever</b><small>Searches the web, scores source credibility</small></div>
+<div><b>3 Analyst</b><small>Extracts cited facts from the sources</small></div>
+<div><b>4 Writer</b><small>Drafts the structured report</small></div>
+<div><b>5 Critic</b><small>Fact-checks each claim against the sources</small></div>
+</section>
+<section class="run" id="run" hidden>
+<aside class="rail"><h3>Agent pipeline</h3><div id="steps"></div></aside>
+<div id="turns"></div>
+</section>
+</main>
+<footer>Built with FastAPI, LangGraph and OpenRouter. Source credibility is a rule-based heuristic on the domain type, not a verdict on any page. Fact-check verdicts come from an LLM critic and can be wrong.</footer>
 <script>
-const f=document.getElementById('f'),out=document.getElementById('out'),steps=document.getElementById('steps'),b=document.getElementById('b');
-const names=['planner','retriever','analyst','writer'];
-const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-f.onsubmit=async e=>{e.preventDefault();b.disabled=true;out.innerHTML='<div class="card">Agents working... (up to ~1 minute)</div>';
-steps.innerHTML=names.map(n=>'<span class="step">'+n+'</span>').join('');
-try{const r=await fetch('/research',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:document.getElementById('q').value})});
-const d=await r.json();if(!r.ok)throw new Error(d.detail||'Request failed');
-steps.innerHTML=names.map(n=>'<span class="step on">'+n+'</span>').join('');
-out.innerHTML='<div class="card"><pre>'+esc(d.report)+'</pre></div><div class="card"><b>Sources</b><br>'+d.sources.map((s,i)=>'['+(i+1)+'] <a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title||s.url)+'</a>').join('<br>')+'</div><div class="card"><small>Plan: '+esc(d.plan.join(' | '))+'<br>Trace: '+esc(d.trace.join(' &rarr; '))+'</small></div>';
-}catch(err){out.innerHTML='<div class="card err">'+esc(err.message)+'</div>'}b.disabled=false};
-</script></main></body></html>
+const $=id=>document.getElementById(id);
+const AG=[['planner','Planner'],['retriever','Retriever'],['analyst','Analyst'],['writer','Writer'],['critic','Critic']];
+const EX=['How does Retrieval-Augmented Generation work?','What are the pros and cons of microservices vs monolith?','How do vaccines train the immune system?','What is the CAP theorem?'];
+let thread=[],busy=false,turnN=0;
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('ex').innerHTML=EX.map(e=>'<span class="chip">'+esc(e)+'</span>').join('');
+$('ex').onclick=e=>{if(e.target.classList.contains('chip')){$('q').value=e.target.textContent;$('f').requestSubmit()}};
+function md(t,id){
+  let h=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\[(\d+)\]/g,(m,n)=>'<span class="cit" data-t="'+id+'" data-n="'+n+'">'+n+'</span>');
+  const out=[];let list=false;
+  for(const raw of h.split('\n')){const l=raw.trim();
+    if(/^[-*\u2022]\s+/.test(l)){if(!list){out.push('<ul>');list=true}out.push('<li>'+l.replace(/^[-*\u2022]\s+/,'')+'</li>')}
+    else{if(list){out.push('</ul>');list=false}
+      if(!l)continue;
+      if(/^#+\s/.test(l))out.push('<h4>'+l.replace(/^#+\s/,'')+'</h4>');else out.push('<p>'+l+'</p>')}}
+  if(list)out.push('</ul>');return out.join('')}
+function host(u){try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return u}}
+function colorFor(s){return s>=80?'var(--ok)':s>=60?'var(--acc)':s>=50?'var(--warn)':'var(--bad)'}
+function renderSteps(st){ $('steps').innerHTML=AG.map(([k,n])=>{const s=st[k]||{};const cls=s.state||'';
+  const icon=cls==='ok'?'&#10003;':cls==='err'?'!':AG.findIndex(a=>a[0]===k)+1;
+  let det='';
+  if(s.state==='run')det='working...';
+  if(s.data){ if(s.data.queries)det=s.data.queries.map(q=>'<q>'+esc(q)+'</q>').join('');
+    else if(s.data.sources)det=s.data.sources.length+' sources found';
+    else if(s.data.claims)det=s.data.claims.length+' claims checked';
+    else if(s.data.text)det=k==='writer'?'report drafted':'findings extracted';}
+  return '<div class="step '+cls+'"><div class="dot">'+icon+'</div><div><div class="sn">'+n+'<em>'+(s.ms?(s.ms/1000).toFixed(1)+'s':'')+'</em></div><div class="sd">'+det+'</div></div></div>'}).join('')}
+function turnShell(q,id){const d=document.createElement('div');d.className='turn';d.id=id;
+  d.innerHTML='<div class="card"><div class="thread-tag">'+(thread.length?'Follow-up '+thread.length:'Research question')+'</div><p class="q">'+esc(q)+'</p><div class="rep" id="rep'+id+'"><span class="sd">Agents are working...</span></div></div><div id="ex'+id+'"></div>';
+  document.querySelectorAll('.turn').forEach(t=>t.classList.add('old'));
+  $('turns').appendChild(d);return d}
+function finish(id,r){
+  $('rep'+id).innerHTML=md(r.report,id);
+  const ok=r.claims.filter(c=>c.verdict==='supported').length;
+  const fc=r.claims.length?'<div class="card"><h3>Critic agent - fact check</h3><div class="score">'+ok+' of '+r.claims.length+' key claims fully supported by the retrieved sources</div>'+
+   r.claims.map(c=>'<div class="claim"><span class="pill '+c.verdict+'">'+c.verdict+'</span><div>'+esc(c.claim)+(c.sources.length?' '+c.sources.map(n=>'<span class="cit" data-t="'+id+'" data-n="'+n+'">'+n+'</span>').join(''):'')+(c.note?'<div class="cn">'+esc(c.note)+'</div>':'')+'</div></div>').join('')+'</div>'
+   :'<div class="card"><h3>Critic agent - fact check</h3><div class="cn">The critic could not produce a verifiable claim list this time.</div></div>';
+  const avg=r.sources.length?Math.round(r.sources.reduce((a,s)=>a+s.credibility.score,0)/r.sources.length):0;
+  const sc='<div class="card" id="srcs'+id+'"><h3>Sources ('+r.sources.length+')'+(r.sources.length?' - average credibility '+avg+'/100':'')+'</h3>'+
+   (r.sources.map((s,i)=>'<div class="src" id="s'+id+'_'+(i+1)+'"><div class="num">'+(i+1)+'</div><div><a class="st" href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.title||host(s.url))+'</a><div class="sh">'+esc(host(s.url))+'</div><div class="ss">'+esc(s.snippet)+'</div><div class="cr"><span class="bar"><i style="width:'+s.credibility.score+'%;background:'+colorFor(s.credibility.score)+'"></i></span>'+esc(s.credibility.label)+' ('+s.credibility.score+') - '+esc(s.credibility.why)+'</div></div></div>').join('')||'<div class="cn">No web results were returned for these queries.</div>')+'</div>';
+  const acts='<div class="acts"><button class="btn sec" data-x="'+id+'">Export Markdown</button><button class="btn sec" data-c="'+id+'">Copy report</button></div>';
+  $('ex'+id).innerHTML=fc+sc;
+  $('rep'+id).insertAdjacentHTML('afterend',acts);
+  const fu=document.createElement('form');fu.className='fu';fu.id='fu';fu.innerHTML='<input id="fq" maxlength="300" placeholder="Ask a follow-up (agents will use this report as context)..." required><button class="btn">Follow up</button>';
+  fu.onsubmit=e=>{e.preventDefault();go($('fq').value)};
+  $('fu')&&$('fu').remove();$('turns').appendChild(fu);window.R=window.R||{};window.R[id]=r;}
+document.addEventListener('click',e=>{const t=e.target;
+  if(t.dataset.n){const el=$('s'+t.dataset.t+'_'+t.dataset.n);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('hl');void el.offsetWidth;el.classList.add('hl')}}
+  if(t.dataset.x){const r=R[t.dataset.x];const m='# '+r.question+'\n\n## Report\n\n'+r.report+'\n\n## Fact check (critic agent)\n\n'+(r.claims.map(c=>'- **'+c.verdict.toUpperCase()+'**: '+c.claim+(c.sources.length?' ['+c.sources.join(', ')+']':'')+(c.note?' - '+c.note:'')).join('\n')||'No claims checked.')+'\n\n## Sources\n\n'+r.sources.map((s,i)=>(i+1)+'. ['+(s.title||s.url)+']('+s.url+') - credibility '+s.credibility.label+' ('+s.credibility.score+'/100, heuristic)').join('\n')+'\n';
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([m],{type:'text/markdown'}));a.download='research-report.md';a.click()}
+  if(t.dataset.c){navigator.clipboard&&navigator.clipboard.writeText(R[t.dataset.c].report);t.textContent='Copied'}});
+async function go(question){
+  question=question.trim();if(busy||question.length<5)return;busy=true;$('b').disabled=true;
+  const fu=$('fu');if(fu)fu.remove();
+  $('hero').hidden=true;$('how').hidden=true;$('run').hidden=false;
+  const id='t'+(++turnN);const st={};renderSteps(st);turnShell(question,id);
+  document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const resp=await fetch('/research/stream',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question,thread:thread.slice(-3)})});
+    if(!resp.ok){const d=await resp.json().catch(()=>({}));throw new Error(d.detail||'Request failed ('+resp.status+')')}
+    const rd=resp.body.getReader(),dec=new TextDecoder();let buf='';
+    while(true){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf('\n\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+2);if(!line.startsWith('data:'))continue;
+        const ev=JSON.parse(line.slice(5));
+        if(ev.type==='start'){st[ev.agent]={state:'run'};renderSteps(st)}
+        else if(ev.type==='done'){st[ev.agent]={state:'ok',ms:ev.ms,data:ev.data};renderSteps(st)}
+        else if(ev.type==='error')throw new Error(ev.message);
+        else if(ev.type==='result'){thread.push({question:ev.question,report:ev.report});finish(id,ev)}}}
+  }catch(err){const cur=AG.find(a=>st[a[0]]&&st[a[0]].state==='run');if(cur){st[cur[0]]={state:'err'};renderSteps(st)}
+    $('rep'+id).innerHTML='<span class="err">'+esc(err.message)+'</span>';}
+  busy=false;$('b').disabled=false;$('q').value=''}
+$('f').onsubmit=e=>{e.preventDefault();thread=[];turnN=0;$('turns').innerHTML='';go($('q').value)};
+</script></body></html>
