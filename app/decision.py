@@ -70,28 +70,37 @@ async def extract_option(option, req):
     key = os.environ.get('OPENROUTER_API_KEY', '')
     if not key:
         raise HTTPException(503, 'AI key is not configured.')
-    try:
-        async with httpx.AsyncClient(timeout=90) as client:
-            r = await client.post('https://openrouter.ai/api/v1/chat/completions',
-                headers={'Authorization': 'Bearer ' + key},
-                json={'model': 'openrouter/free', 'max_tokens': 1800, 'temperature': 0,
-                      'messages': [{'role': 'system', 'content': system},
-                                   {'role': 'user', 'content': json.dumps({'goal': req['goal'],
-                                    'criteria': req['criteria'], 'option': option}, ensure_ascii=False)}]})
+    model = os.environ.get('OPENROUTER_MODEL') or 'openrouter/free'
+    payload = {'model': model, 'max_tokens': 4000, 'temperature': 0,
+               'messages': [{'role': 'system', 'content': system},
+                            {'role': 'user', 'content': json.dumps({'goal': req['goal'],
+                             'criteria': req['criteria'], 'option': option}, ensure_ascii=False)}]}
+    raw, why = None, 'unknown'
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=100) as client:
+                r = await client.post('https://openrouter.ai/api/v1/chat/completions',
+                    headers={'Authorization': 'Bearer ' + key}, json=payload)
+        except httpx.HTTPError:
+            why = 'timeout'
+            continue
         if r.status_code != 200:
-            raise HTTPException(503, 'Free AI provider unavailable or rate limited. Try later; no paid fallback is used.')
-        content = r.json()['choices'][0]['message']['content'].strip()
-        match = re.search(r'\{.*\}', content, re.S)
-        parsed = json.loads(match.group(0) if match else content)
-        raw = parsed.get('findings', [])
-        if not isinstance(raw, list):
-            raw = []
-    except HTTPException:
-        raise
-    except (KeyError, ValueError, TypeError):
-        raw = []
-    except httpx.HTTPError:
-        raise HTTPException(503, 'Free AI provider timed out. Try later; no paid fallback is used.')
+            why = f'provider status {r.status_code}'
+            continue
+        try:
+            ch = r.json()['choices'][0]
+            content = (ch['message'].get('content') or '').strip()
+            match = re.search(r'\{.*\}', content, re.S)
+            parsed = json.loads(match.group(0) if match else content)
+            found = parsed.get('findings')
+            if isinstance(found, list):
+                raw = found
+                break
+            why = 'no findings list'
+        except (KeyError, ValueError, TypeError, IndexError):
+            why = 'unreadable model output'
+    if raw is None:
+        raise HTTPException(503, f'The free AI model did not return usable output ({why}). Try again in a minute. No paid fallback is used.')
     return {'name': option['name'], 'source': option['source'],
             'findings': verify_findings(raw, option['text'], req['criteria'])}
 
@@ -112,7 +121,7 @@ def brief_agent(state):
                 questions.append({'option': option['name'], 'question': f"Does this restriction affect our need for {cell['criterion']}? Quote: {cell['quote']}"})
     return {'result': {'goal': req['goal'], 'criteria': req['criteria'], 'options': options,
         'questions': questions, 'created_at': datetime.now(timezone.utc).isoformat(),
-        'model_route': 'openrouter/free',
+        'model_route': os.environ.get('OPENROUTER_MODEL') or 'openrouter/free',
         'summary': 'Use this evidence matrix to review fit. Unknown does not mean unsupported by the product. No automatic winner is chosen.',
         'caveat': 'Quotes are matched against your pasted text, not independently verified against the source URL. AI may misread a quote. Check the original and current pricing before buying. Do not paste confidential information: text is sent to OpenRouter.'}}
 
