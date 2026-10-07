@@ -55,10 +55,31 @@ main{max-width:1100px;margin:0 auto;padding:0 20px 60px}
 .err{color:var(--bad)}
 .thread-tag{font-size:12px;color:var(--acc2);margin-bottom:6px}
 footer{max-width:1100px;margin:0 auto;padding:0 20px 40px;color:var(--mut);font-size:12.5px;text-align:center}
+
+.tabs{display:flex;gap:8px;justify-content:center;margin:0 auto 18px}.tab{background:#0c1228;border:1px solid var(--line);color:#b9c2e6;border-radius:99px;padding:8px 18px;cursor:pointer;font-size:14px;font-weight:600}.tab.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent}
+.dec{max-width:900px;margin:10px auto 0}.dec label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
+.dec input,.dec textarea{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--txt);font:15px/1.5 inherit;padding:10px 12px;outline:0}.dec textarea{min-height:150px;resize:vertical}
+.dec .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.dec .two{grid-template-columns:1fr}}
+.mx{width:100%;border-collapse:collapse;font-size:13.5px}.mx th,.mx td{border-top:1px solid var(--line);padding:10px;vertical-align:top;text-align:left}.mx th{color:var(--mut);font-size:12px;text-transform:uppercase}
+.mxw{overflow-x:auto}.pill.documented{background:#0f3324;color:var(--ok)}.pill.limitation{background:#3a2e0f;color:var(--warn)}.pill.unknown{background:#262c4a;color:var(--mut)}
+blockquote{margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--acc);background:#0c1228;color:#b9c2e6;font-size:12.5px}
 </style></head><body>
-<div class="top"><div class="brand"><div class="logo">&#9672;</div>Multi-Agent Research Lab</div><div class="tags"><span>LangGraph</span><span>FastAPI</span><span>5 agents</span></div></div>
+<div class="top"><div class="brand"><div class="logo">&#9672;</div>Multi-Agent Research Lab</div><div class="tags"><span>LangGraph</span><span>FastAPI</span><span>5 agents</span><span>Decision brief</span></div></div>
 <main>
-<section class="hero" id="hero">
+<div class="tabs"><button class="tab on" id="tabR" type="button">Research</button><button class="tab" id="tabD" type="button">Vendor decision brief</button></div>
+<section class="dec" id="dec" hidden>
+<h2 style="margin:0 0 6px">Compare two vendors using only their own documentation</h2>
+<p class="note" style="text-align:left;margin:0 0 6px">Paste documentation excerpts for two options and list what you need. Each finding is shown only if its exact quote exists in your pasted text. Anything not documented is marked Unknown, with a question to ask the vendor. No winner is picked for you. Do not paste confidential data: text is sent to OpenRouter.</p>
+<form id="df">
+<label for="dg">Your goal</label><input id="dg" maxlength="400" minlength="10" required placeholder="e.g. Choose a support tool for a 20 person team in the EU">
+<label for="dc">Requirements, one per line (2 to 6)</label><textarea id="dc" style="min-height:90px" required placeholder="SSO support&#10;Audit logs&#10;EU data residency"></textarea>
+<div class="two"><div><label for="dn1">Option 1 name</label><input id="dn1" maxlength="80" required><label for="ds1">Option 1 source link</label><input id="ds1" maxlength="300" required placeholder="https://..."><label for="dt1">Option 1 documentation text</label><textarea id="dt1" maxlength="10000" minlength="80" required></textarea></div>
+<div><label for="dn2">Option 2 name</label><input id="dn2" maxlength="80" required><label for="ds2">Option 2 source link</label><input id="ds2" maxlength="300" required placeholder="https://..."><label for="dt2">Option 2 documentation text</label><textarea id="dt2" maxlength="10000" minlength="80" required></textarea></div></div>
+<div class="acts"><button class="btn" id="db">Build evidence matrix</button><button class="btn sec" id="dsample" type="button">Load sample</button></div>
+</form>
+<div id="dout" style="margin-top:20px"></div>
+</section>
+<div id="rview"><section class="hero" id="hero">
 <h1>Five AI agents. <span class="grad">One fact-checked report.</span></h1>
 <p>Ask any research question. Watch a planner, retriever, analyst, writer and critic work through it live, then check every claim against the sources.</p>
 </section>
@@ -76,7 +97,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 20px 40px;color:var(--mut);font-
 <aside class="rail"><h3>Agent pipeline</h3><div id="steps"></div></aside>
 <div id="turns"></div>
 </section>
-</main>
+</div></main>
 <footer>Built with FastAPI, LangGraph and OpenRouter. Source credibility is a rule-based heuristic on the domain type, not a verdict on any page. Fact-check verdicts come from an LLM critic and can be wrong.</footer>
 <script>
 const $=id=>document.getElementById(id);
@@ -151,4 +172,24 @@ async function go(question){
     $('rep'+id).innerHTML='<span class="err">'+esc(err.message)+'</span>';}
   busy=false;$('b').disabled=false;$('q').value=''}
 $('f').onsubmit=e=>{e.preventDefault();thread=[];turnN=0;$('turns').innerHTML='';go($('q').value)};
+
+const SAMPLE={g:'Choose a help desk tool for a 20 person team that needs SSO and audit trails',c:'Single sign-on (SSO)\nAudit logs\nEU data residency',
+ a:['DeskOne','https://example.com/deskone-docs','SSO via SAML is available on the Business plan and above. Audit logs record admin actions and are retained for 180 days on Enterprise. Customer data can be hosted in the EU region on request for Enterprise accounts.'],
+ b:['HelpLoop','https://example.com/helploop-docs','HelpLoop supports Google and Microsoft login for all plans. Agents can export ticket history as CSV at any time. Data is hosted in the United States with daily backups.']};
+function setTab(d){$('dec').hidden=!d;$('rview').hidden=d;$('tabD').classList.toggle('on',d);$('tabR').classList.toggle('on',!d)}
+$('tabR').onclick=()=>setTab(false);$('tabD').onclick=()=>setTab(true);
+$('dsample').onclick=()=>{$('dg').value=SAMPLE.g;$('dc').value=SAMPLE.c;[['dn1','ds1','dt1',SAMPLE.a],['dn2','ds2','dt2',SAMPLE.b]].forEach(([n,s,t,v])=>{$(n).value=v[0];$(s).value=v[1];$(t).value=v[2]})};
+function dview(r){
+ const rows=r.criteria.map((c,i)=>'<tr><th>'+esc(c)+'</th>'+r.options.map(o=>{const f=o.findings[i];return '<td><span class="pill '+f.status+'">'+f.status+'</span><div>'+esc(f.finding)+'</div>'+(f.quote?'<blockquote>&ldquo;'+esc(f.quote)+'&rdquo;</blockquote>':'')+'</td>'}).join('')+'</tr>').join('');
+ const qs=r.questions.length?'<div class="card"><h3>Questions to ask before deciding</h3><ul>'+r.questions.map(q=>'<li><b>'+esc(q.option)+':</b> '+esc(q.question)+'</li>').join('')+'</ul></div>':'';
+ const md='# Decision brief\n\nGoal: '+r.goal+'\n\n'+r.criteria.map((c,i)=>'## '+c+'\n'+r.options.map(o=>'- **'+o.name+'** ('+o.findings[i].status+'): '+o.findings[i].finding+(o.findings[i].quote?' > "'+o.findings[i].quote+'"':'')).join('\n')).join('\n\n')+'\n\n## Questions\n'+r.questions.map(q=>'- '+q.option+': '+q.question).join('\n')+'\n\n'+r.caveat+'\n';
+ window.DM=md;
+ $('dout').innerHTML='<div class="card"><h3>Evidence matrix</h3><div class="score">'+esc(r.summary)+'</div><div class="mxw"><table class="mx"><tr><th></th>'+r.options.map(o=>'<th>'+esc(o.name)+'<div class="sh" style="text-transform:none">'+esc(o.source)+'</div></th>').join('')+'</tr>'+rows+'</table></div></div>'+qs+'<div class="note" style="text-align:left">'+esc(r.caveat)+'</div><div class="acts"><button class="btn sec" id="dx" type="button">Export Markdown</button></div>';
+ $('dx').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([window.DM],{type:'text/markdown'}));a.download='decision-brief.md';a.click()}}
+$('df').onsubmit=async e=>{e.preventDefault();const crit=$('dc').value.split('\n').map(x=>x.trim()).filter(Boolean);
+ $('db').disabled=true;$('dout').innerHTML='<span class="sd">Two evidence agents are reading each document. This can take up to a minute...</span>';
+ try{const resp=await fetch('/decision',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({goal:$('dg').value.trim(),criteria:crit,options:[{name:$('dn1').value.trim(),source:$('ds1').value.trim(),text:$('dt1').value},{name:$('dn2').value.trim(),source:$('ds2').value.trim(),text:$('dt2').value}]})});
+  const d=await resp.json().catch(()=>({}));if(!resp.ok)throw new Error(typeof d.detail==='string'?d.detail:'Check the form: 2-6 distinct requirements, two different option names, 80-10000 characters of text each.');dview(d)}
+ catch(err){$('dout').innerHTML='<span class="err">'+esc(err.message)+'</span>'}
+ $('db').disabled=false};
 </script></body></html>
