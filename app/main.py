@@ -303,3 +303,13 @@ app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__
 @app.get("/")
 async def index():
     return FileResponse(os.path.join(os.path.dirname(__file__), "static", "index.html"))
+
+
+# One focused feature: evidence-first vendor decision brief.
+from app.decision import DecisionReq, decision_graph
+
+@app.post("/decision")
+async def decision_brief(req: DecisionReq, request: Request):
+    _gate(request)
+    result = await decision_graph.ainvoke({"request": req.model_dump()})
+    return result["result"]
